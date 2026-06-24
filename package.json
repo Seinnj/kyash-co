@@ -1,0 +1,16 @@
+{
+  "name": "kyash-auth",
+  "version": "1.0.0",
+  "description": "Kyash authentication system",
+  "main": "api/auth.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'No build needed'"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.0"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}

