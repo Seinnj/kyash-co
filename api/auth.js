@@ -3,6 +3,9 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_ANON_KEY;
 
+console.log('SUPABASE_URL:', supabaseUrl ? 'SET' : 'NOT SET');
+console.log('SUPABASE_ANON_KEY:', supabaseKey ? 'SET' : 'NOT SET');
+
 if (!supabaseUrl || !supabaseKey) {
   throw new Error('Missing Supabase environment variables');
 }
@@ -172,4 +175,4 @@ export default async function handler(req, res) {
       error: error.message || 'Internal server error',
     });
   }
-    }
+}
