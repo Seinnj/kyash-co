@@ -2,6 +2,7 @@
   "name": "kyash-auth",
   "version": "1.0.0",
   "description": "Kyash authentication system",
+  "type": "module",
   "main": "api/auth.js",
   "scripts": {
     "dev": "vercel dev",
